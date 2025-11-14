@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <unistd.h> 
+#include "Display.h"
 #include "board.h"
 
 const char SMALLJ1 = 'x';
@@ -7,6 +9,12 @@ const char LARGEJ1 = '#';
 const char SMALLJ2 = '.';
 const char MEDIUMJ2 = 'o';
 const char LARGEJ2 = 'O';
+int Turnojugador;
+
+player who_wins_diagonal(board game);
+player who_wins_antidiagonal(board game);
+player who_wins_column(board game, int col);
+player who_wins_line(board game, int row);
 
 void Tablero(board game) {
     printf("\n");
@@ -39,7 +47,7 @@ void Tablero(board game) {
         printf("\n");
 
         if (i < DIMENSIONS - 1) {
-            printf("---+---+---\n"); 
+            printf("----+-----+----\n"); 
         }
     }
     printf("\n");
@@ -67,7 +75,7 @@ void Carcel(board game) {
 }
 
 int InteraccionMover(board game, player *current_player) {
-     int NumEnCasa = 0;
+    int NumEnCasa = 0;
 
     for (int s = SMALL; s <= LARGE; s++) {
         NumEnCasa += get_nb_piece_in_house(game, *current_player, (size)s);  
@@ -75,7 +83,8 @@ int InteraccionMover(board game, player *current_player) {
 
     if (NumEnCasa > 5) {
         printf("Toutes tes pièces sont dans la maison. Tu ne peux pas déplacer.\n");
-        return;  
+        sleep(2);
+        return *current_player;   // ✔ FIX
     }
 
     int ColumnaI, FilaI;
@@ -83,107 +92,203 @@ int InteraccionMover(board game, player *current_player) {
     scanf("%d", &ColumnaI);
     printf("Fila ?\n");
     scanf("%d", &FilaI);
+   
 
-    // Validación de coordenadas
     if (ColumnaI < 0 || FilaI < 0 || ColumnaI >= DIMENSIONS || FilaI >= DIMENSIONS) {
-        printf("Doit choisir entre le tableau de %dx%d\n", DIMENSIONS, DIMENSIONS);
-        return;  
+        printf("Coordonnées invalides.\n");
+        return *current_player;  // ✔ FIX
     }
 
     printf("Où veux-tu que la pièce finisse ?\n");
     int ColumnaF, FilaF;
     printf("Colonne ?\n");
     scanf("%d", &ColumnaF);
-    printf("Fila?\n");
+    printf("Fila ?\n");
     scanf("%d", &FilaF);
 
-    // Validación de coordenadas de destino
     if (ColumnaF < 0 || FilaF < 0 || ColumnaF >= DIMENSIONS || FilaF >= DIMENSIONS) {
-        printf("Doit bouger entre le tableau de %dx%d\n", DIMENSIONS, DIMENSIONS);
-        return;  
+        printf("Coordonnées invalides.\n");
+        sleep(2);
+        return *current_player;  // ✔ FIX
     }
 
-    // Verificar que el jugador tenga una pieza en la posición inicial
     char pieceHolder = get_place_holder(game, FilaI, ColumnaI);
-    if (pieceHolder == *current_player) {
-        int res = move_piece(game, FilaI, ColumnaI, FilaF, ColumnaF);
-        if (res == 0) {
-            return 0;
-        } else {
-            printf("Error %d\n", res);
-            return 1;
-        }
+    if (pieceHolder != *current_player) {
+        printf("Ce n'est pas ta pièce.\n");
+        sleep(2);
+        return *current_player;   // ✔ FIX
+    }
+    
+    int res = move_piece(game, FilaI, ColumnaI, FilaF, ColumnaF);
+
+    if (res == 0) {
+        *current_player = next_player(*current_player);
     } else {
-        printf("Ce n'est pas ta pièce\n");
-        return 1;
-    }      
+        printf("Error %d\n", res);
+        sleep(2);
+    }
+
+    return *current_player;  // ✔ FIX
 }
 
-int InteraccionPlace(board game, player *current_player) {
-    printf("Quelle taille de pièce que tu voudras bouger ?\n");
-    printf("0) Small     1) Medium       2) Large\n");
+
+int InteraccionPlace(board game, player *current_player, int gobbler, int r, int c)
+{
+    printf("Quelle taille ? 0=Small, 1=Medium, 2=Large\n");
 
     int Tamano;
     scanf("%d", &Tamano);
 
-    // Mapear entrada a la enumeración de tamaños
-    size piece_size;
-    switch (Tamano) {
-        case 0: piece_size = SMALL; break;
-        case 1: piece_size = MEDIUM; break;
-        case 2: piece_size = LARGE; break;
-        default:
-            printf("Choix invalide. Taille SMALL.\n");
-            piece_size = SMALL;
-    }
+    size piece_size = SMALL;
+    if (Tamano == 1) piece_size = MEDIUM;
+    if (Tamano == 2) piece_size = LARGE;
 
-    int ColumnaF,FilaF;
-    printf("Où veux-tu que la pièce finisse ?\n");
+    int ColumnaF, FilaF;
     printf("Colonne ?\n");
-    scanf("%d ", &ColumnaF);
+    scanf("%d", &ColumnaF);
     printf("Fila ?\n");
-    scanf("%d ", &FilaF);
+    scanf("%d", &FilaF);
 
-    // Validación de coordenadas
-    if (ColumnaF < 0 || FilaF < 0 || ColumnaF >= DIMENSIONS || FilaF >= DIMENSIONS) {
-        printf("Doit bouger entre le tableau de %dx%d\n", DIMENSIONS, DIMENSIONS);
-        return;  
+    // ---------- CASO GOBBER OBLIGATORIO ----------
+    if (gobbler == 1) {
+        // Seguridad extra: solo se permite gober si el adversario TIENE 3 en línea ahora mismo
+        player winner = get_winner(game);
+        if (winner == NO_PLAYER || winner == *current_player) {
+            // Algo raro pasó: ya no hay alineamiento del adversario → no se puede gober
+            printf("Tu ne peux plus gober car il n'y a plus d'alignement adverse.\n");
+            sleep(2);
+            return *current_player;
+        }
+
+        // Debe jugar EXACTAMENTE en (r,c)
+        if (ColumnaF != c || FilaF != r) {
+            printf("Tu dois gober en (%d,%d) !\n", r, c);
+            sleep(2);
+            return *current_player;   // no cambia el turno
+        }
+
+        // Verificar que la pieza sea más grande que la que está en (r,c)
+        size pieza_objetivo = get_piece_size(game, r, c);
+        if (piece_size <= pieza_objetivo) {
+            printf("Ta pièce n'est pas assez grande pour gober !\n");
+            sleep(2);
+            return *current_player;
+        }
+
+        int res = place_piece(game, *current_player, piece_size, r, c);
+        if (res == 0) {
+            *current_player = next_player(*current_player);
+        } else {
+            printf("Erreur %d\n", res);
+            sleep(2);
+        }
+        return *current_player;
     }
 
-    char pieceHolder = get_place_holder(game, FilaI, ColumnaI);
-    player opponent = (*current_player == PLAYER_1) ? PLAYER_2 : PLAYER_1;
+    // ---------- CASO NORMAL (NO SE PUEDE GOBER) ----------
+    if (ColumnaF < 0 || FilaF < 0 || ColumnaF >= DIMENSIONS || FilaF >= DIMENSIONS) {
+        printf("Coordonnées invalides.\n");
+        sleep(2);
+        return *current_player;
+    }
 
-    if(pieceHolder==NO_PLAYER){
-        int res = place_piece(game, *current_player, piece_size, FilaF, ColumnaF);
-        switch (res) {
-            case 0: 
-                return 0; 
-                break;
-            case 1: 
-                printf("Erreur : La pièce n'est pas disponible dans la maison du joueur.\n"); 
-                return 1; 
-                break;
-            case 2: 
-                printf("Erreur : La pièce est trop petite pour être placée à cet endroit.\n"); 
-                return 1;
-                break;
-            case 3: 
-                printf("Erreur : Coordonnées illégales. Essayez encore.\n");
-                return 1;
-                break;
-            default:  
-                printf("Erreur inconnue.\n");
-                return 1;
-        }
-    }else if(pieceHolder==opponent){
-        ganador = get_winner(game);
-        if(ganador==pieceHolder){
-           
+    size s_casilla = get_piece_size(game, FilaF, ColumnaF);
 
-        } else{printf("Ne gober en mettant une pièce en jeu");
-        return; }
-        
-    } else{printf("Ne gober en mettant une pièce en jeu");
-        return; }
- 
+    // Prohibido gober si gobbler == 0
+    if (s_casilla != NONE) {
+        printf("Tu ne peux pas gober en mettant une pièce en jeu.\n");
+        sleep(2);
+        return *current_player;
+    }
+
+    int res = place_piece(game, *current_player, piece_size, FilaF, ColumnaF);
+    if (res == 0) {
+        *current_player = next_player(*current_player);
+    } else {
+        printf("Erreur %d\n", res);
+        sleep(2);
+    }
+
+    return *current_player;
 }
+
+void TipoLinea(board game, LineType *tipo, int *posicion)
+{
+    player winner;
+
+    winner = who_wins_diagonal(game);
+    if (winner != NO_PLAYER) {
+        *tipo = DIAGONAL;
+        *posicion = -1;
+        return;
+    }
+
+    winner = who_wins_antidiagonal(game);
+    if (winner != NO_PLAYER) {
+        *tipo = ANTIDIAGONAL;
+        *posicion = -1;
+        return;
+    }
+
+    for (int i = 0; i < DIMENSIONS; i++) {
+        winner = who_wins_column(game, i);
+        if (winner != NO_PLAYER) {
+            *tipo = COLUMN;
+            *posicion = i;
+            return;
+        }
+
+        winner = who_wins_line(game, i);
+        if (winner != NO_PLAYER) {
+            *tipo = ROW;
+            *posicion = i;
+            return;
+        }
+    }
+
+    *tipo = NO_LINE;
+    *posicion = -1;
+}
+
+
+void BuscarGober(board game, LineType tipo, int pos, player ganador, int *row, int *col)
+{
+    player perdedor = (ganador == PLAYER_1 ? PLAYER_2 : PLAYER_1);
+
+    for (int i = 0; i < 3; i++) {
+        int r, c;
+
+        if (tipo == DIAGONAL) {
+            r = i; c = i;
+        }
+        else if (tipo == ANTIDIAGONAL) {
+            r = i; c = 2 - i;
+        }
+        else if (tipo == ROW) {
+            r = pos; c = i;
+        }
+        else if (tipo == COLUMN) {
+            r = i; c = pos;
+        } else {
+            *row = -1;
+            *col = -1;
+            return;
+        }
+
+        size s = get_piece_size(game, r, c);
+
+        if (s == SMALL) {
+            if (get_nb_piece_in_house(game, perdedor, MEDIUM) > 0) { *row=r; *col=c; return; }
+            if (get_nb_piece_in_house(game, perdedor, LARGE) > 0)  { *row=r; *col=c; return; }
+        }
+
+        if (s == MEDIUM) {
+            if (get_nb_piece_in_house(game, perdedor, LARGE) > 0) { *row=r; *col=c; return; }
+        }
+    }
+
+    *row = -1;
+    *col = -1;
+}
+
+
