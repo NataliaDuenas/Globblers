@@ -96,7 +96,7 @@ int InteraccionMover(board game, player *current_player) {
 
     if (ColumnaI < 0 || FilaI < 0 || ColumnaI >= DIMENSIONS || FilaI >= DIMENSIONS) {
         printf("Coordonnées invalides.\n");
-        return *current_player;  // ✔ FIX
+        return *current_player;  
     }
 
     printf("Où veux-tu que la pièce finisse ?\n");
@@ -109,14 +109,14 @@ int InteraccionMover(board game, player *current_player) {
     if (ColumnaF < 0 || FilaF < 0 || ColumnaF >= DIMENSIONS || FilaF >= DIMENSIONS) {
         printf("Coordonnées invalides.\n");
         sleep(2);
-        return *current_player;  // ✔ FIX
+        return *current_player;  
     }
 
     char pieceHolder = get_place_holder(game, FilaI, ColumnaI);
     if (pieceHolder != *current_player) {
         printf("Ce n'est pas ta pièce.\n");
         sleep(2);
-        return *current_player;   // ✔ FIX
+        return *current_player;   
     }
     
     int res = move_piece(game, FilaI, ColumnaI, FilaF, ColumnaF);
@@ -149,25 +149,20 @@ int InteraccionPlace(board game, player *current_player, int gobbler, int r, int
     printf("Fila ?\n");
     scanf("%d", &FilaF);
 
-    // ---------- CASO GOBBER OBLIGATORIO ----------
     if (gobbler == 1) {
-        // Seguridad extra: solo se permite gober si el adversario TIENE 3 en línea ahora mismo
         player winner = get_winner(game);
         if (winner == NO_PLAYER || winner == *current_player) {
-            // Algo raro pasó: ya no hay alineamiento del adversario → no se puede gober
             printf("Tu ne peux plus gober car il n'y a plus d'alignement adverse.\n");
             sleep(2);
             return *current_player;
         }
 
-        // Debe jugar EXACTAMENTE en (r,c)
         if (ColumnaF != c || FilaF != r) {
             printf("Tu dois gober en (%d,%d) !\n", r, c);
             sleep(2);
-            return *current_player;   // no cambia el turno
+            return *current_player;   
         }
 
-        // Verificar que la pieza sea más grande que la que está en (r,c)
         size pieza_objetivo = get_piece_size(game, r, c);
         if (piece_size <= pieza_objetivo) {
             printf("Ta pièce n'est pas assez grande pour gober !\n");
@@ -185,7 +180,6 @@ int InteraccionPlace(board game, player *current_player, int gobbler, int r, int
         return *current_player;
     }
 
-    // ---------- CASO NORMAL (NO SE PUEDE GOBER) ----------
     if (ColumnaF < 0 || FilaF < 0 || ColumnaF >= DIMENSIONS || FilaF >= DIMENSIONS) {
         printf("Coordonnées invalides.\n");
         sleep(2);
@@ -194,7 +188,6 @@ int InteraccionPlace(board game, player *current_player, int gobbler, int r, int
 
     size s_casilla = get_piece_size(game, FilaF, ColumnaF);
 
-    // Prohibido gober si gobbler == 0
     if (s_casilla != NONE) {
         printf("Tu ne peux pas gober en mettant une pièce en jeu.\n");
         sleep(2);

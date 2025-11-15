@@ -5,4 +5,5 @@ RUN apt update && apt install -y \
     && apt clean
 
 RUN useradd -ms /bin/bash dev
+RUN apt-get update && apt-get install -y git
 USER dev
